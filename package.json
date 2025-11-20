@@ -7,6 +7,7 @@
     "dist"
   ],
   "scripts": {
+    "start": "npx ts-node src/index.ts",
     "build": "tsc",
     "test": "jest",
     "test:coverage": "jest --coverage",
@@ -56,6 +57,7 @@
     "crypto-js": "^4.2.0",
     "dotenv": "^16.6.1",
     "ethers": "^6.14.3",
+    "ts-node": "^10.9.2",
     "typescript": "^5.8.3",
     "valibot": "^1.1.0",
     "web3": "^4.16.0"
