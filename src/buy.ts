@@ -14,17 +14,17 @@ interface TokenInfo {
 dotenv.config();
 const SOL_ADDRESS = '11111111111111111111111111111111'; // SOL
 const TARGET_ADDRESS = process.env.TARGET_TOKEN_ADDRESS!; // Target token address (e.g., USDC on Solana)
-const TRADE_INTERVAL_SEC = Number(process.env.TRADE_INTERVAL_SEC!);
+const TRADE_INTERVAL_SEC_MIN = Number(process.env.TRADE_INTERVAL_SEC!.split('-')[0]);
+const TRADE_INTERVAL_SEC_MAX = Number(process.env.TRADE_INTERVAL_SEC!.split('-')[1]);
 const LOWER_PRICE_THRESHOLD = Number(process.env.LOWER_PRICE_THRESHOLD!);
-const UPPER_PRICE_THRESHOLD = Number(process.env.UPPER_PRICE_THRESHOLD!);
 let LAST_TRADE_TIMESTAMP_SEC = 0;
-const BUY_AMOUNT = Number(process.env.BUY_AMOUNT!);
-const SELL_AMOUNT = Number(process.env.SELL_AMOUNT!);
+const BUY_AMOUNT_MIN = Number(process.env.BUY_AMOUNT!.split('-')[0]);
+const BUY_AMOUNT_MAX = Number(process.env.BUY_AMOUNT!.split('-')[1]);
 
 
 // Solana setup
 const solanaConnection = new Connection(process.env.SOLANA_RPC_URL!);
-const solanaWallet = createWallet(process.env.SOLANA_PRIVATE_KEY!, solanaConnection);
+const solanaWallet = createWallet(process.env.SOLANA_BUY_PRIVATE_KEY!, solanaConnection);
 
 // Initialize the client
 const client = new OKXDexClient({
@@ -71,8 +71,8 @@ async function getQuote(fromTokenAddress: string, toTokenAddress: string, amount
 
 async function executeSwap(tokenInfo: { fromToken: TokenInfo, toToken: TokenInfo }, humanReadableAmount: number) {
     try {
-        if (!process.env.SOLANA_PRIVATE_KEY) {
-            throw new Error('Missing SOLANA_PRIVATE_KEY in .env file');
+        if (!process.env.SOLANA_BUY_PRIVATE_KEY) {
+            throw new Error('Missing SOLANA_BUY_PRIVATE_KEY in .env file');
         }
         const rawAmount = (humanReadableAmount * Math.pow(10, tokenInfo.fromToken.decimals)).toString();
         console.log("--------------------------------------------------------------------------------");
@@ -88,7 +88,7 @@ async function executeSwap(tokenInfo: { fromToken: TokenInfo, toToken: TokenInfo
             toTokenAddress: tokenInfo.toToken.address,
             amount: rawAmount,
             slippagePercent: '0.5', // 0.5% slippagePercent
-            userWalletAddress: process.env.SOLANA_WALLET_ADDRESS!
+            userWalletAddress: process.env.SOLANA_BUY_WALLET_ADDRESS!
         });
         console.log("买入操作成功，交易详情如下:");
         console.log(JSON.stringify(swapResult, null, 2));
@@ -110,11 +110,18 @@ async function executeSwap(tokenInfo: { fromToken: TokenInfo, toToken: TokenInfo
 
 function checkTradeInterval(): boolean {
     const currentTimestampSec = Math.floor(Date.now() / 1000);
-    if (currentTimestampSec - LAST_TRADE_TIMESTAMP_SEC < TRADE_INTERVAL_SEC) {
-        console.log(`距离上次交易时间不足设定的间隔${TRADE_INTERVAL_SEC}秒，跳过此次交易`);
+    const randomInterval = Math.floor(Math.random() * (TRADE_INTERVAL_SEC_MAX - TRADE_INTERVAL_SEC_MIN + 1)) + TRADE_INTERVAL_SEC_MIN;
+    if (currentTimestampSec - LAST_TRADE_TIMESTAMP_SEC < randomInterval) {
+        console.log(`距离上次交易时间不足设定的间隔${randomInterval}秒，跳过此次交易`);
         return false;
     }
     return true;
+}
+
+// 保留6位随机小树点
+function randomBuyAmount(): number {
+    const randomAmount = Math.random() * (BUY_AMOUNT_MAX - BUY_AMOUNT_MIN) + BUY_AMOUNT_MIN;
+    return Math.floor(randomAmount * 1e6) / 1e6;
 }
 
 new Scheduler(async () => {
@@ -128,12 +135,7 @@ new Scheduler(async () => {
     }
     if (Number(tokenInfo.toToken.price) < LOWER_PRICE_THRESHOLD && checkTradeInterval()) {
         console.log(`价格低于设定的下限${LOWER_PRICE_THRESHOLD}，执行买入操作`);
-        await executeSwap({fromToken: tokenInfo.fromToken, toToken: tokenInfo.toToken}, BUY_AMOUNT);
-        return
-    }
-    if (Number(tokenInfo.toToken.price) > UPPER_PRICE_THRESHOLD && checkTradeInterval()) {
-        console.log(`价格高于设定的上限${UPPER_PRICE_THRESHOLD}，执行卖出操作`);
-        await executeSwap({fromToken: tokenInfo.toToken, toToken: tokenInfo.fromToken}, SELL_AMOUNT);
+        await executeSwap({fromToken: tokenInfo.fromToken, toToken: tokenInfo.toToken}, randomBuyAmount());
         return
     }
 }, 5 * 1000)
