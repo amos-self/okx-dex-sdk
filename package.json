@@ -7,7 +7,7 @@
     "dist"
   ],
   "scripts": {
-    "start": "npx ts-node src/index.ts",
+    "start": "npx ts-node src/buy.ts",
     "build": "tsc",
     "test": "jest",
     "test:coverage": "jest --coverage",
